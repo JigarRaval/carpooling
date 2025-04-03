@@ -25,14 +25,12 @@ const Login = ({ onLogin }) => {
       });
 
       if (response.status === 200) {
-        // Store user data in localStorage
         const userData = response.data.data;
         localStorage.setItem("userData", JSON.stringify(userData));
         localStorage.setItem("token", userData.token);
         localStorage.setItem("id", userData._id);
         localStorage.setItem("role", userData.role);
 
-        // Call the onLogin callback to update global state
         if (onLogin) {
           onLogin(userData);
         }
@@ -44,10 +42,10 @@ const Login = ({ onLogin }) => {
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
+          theme: "dark",
         });
 
-        // Redirect to home page after successful login
-        navigate("/");
+        navigate(userData.role === "driver" ? "/driver/dashboard" : "/");
       }
     } catch (error) {
       let errorMessage = "Login failed";
@@ -61,6 +59,7 @@ const Login = ({ onLogin }) => {
         closeOnClick: true,
         pauseOnHover: true,
         draggable: true,
+        theme: "dark",
       });
     } finally {
       setIsLoading(false);
@@ -68,145 +67,152 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div
+      className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 flex items-center justify-center p-4"
+      style={{ animation: "fadeIn 0.5s ease-out" }}
+    >
       <ToastContainer />
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Or{" "}
+      <div className="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">
+            Welcome Back
+          </h1>
+          <p className="text-gray-400 mt-2 text-sm md:text-base">
+            Sign in to continue your journey
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(submitHandler)} className="space-y-6">
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email Address
+            </label>
+            <div className="relative transition-transform duration-200 hover:scale-[1.02]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiMail className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="email"
+                {...register("email", {
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Invalid email address",
+                  },
+                })}
+                className="w-full pl-10 px-4 py-3 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="your@email.com"
+              />
+            </div>
+            {errors.email && (
+              <p className="text-sm text-red-400 mt-1 animate-fadeIn">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
+            <div className="relative transition-transform duration-200 hover:scale-[1.02]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiLock className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="password"
+                {...register("password", {
+                  required: "Password is required",
+                  minLength: {
+                    value: 6,
+                    message: "Password must be at least 6 characters",
+                  },
+                })}
+                className="w-full pl-10 px-4 py-3 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="••••••••"
+              />
+            </div>
+            {errors.password && (
+              <p className="text-sm text-red-400 mt-1 animate-fadeIn">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          {/* Remember Me & Forgot Password */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                className="h-4 w-4 text-teal-500 focus:ring-teal-500 bg-gray-700 border-gray-600 rounded"
+              />
+              <label
+                htmlFor="remember-me"
+                className="ml-2 block text-sm text-gray-300"
+              >
+                Remember me
+              </label>
+            </div>
+
+            <Link
+              to="/forgot-password"
+              className="text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors duration-200"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-gradient-to-r from-teal-500 to-teal-600 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-teal-700 flex items-center justify-center shadow-lg transition-all duration-300 active:scale-95"
+          >
+            {isLoading ? (
+              <>
+                <FaSpinner className="animate-spin mr-2" />
+                Signing in...
+              </>
+            ) : (
+              "Sign In"
+            )}
+          </button>
+        </form>
+
+        {/* Sign Up Link */}
+        <div className="text-center mt-6 text-gray-400">
+          Don't have an account?{" "}
           <Link
             to="/register"
-            className="font-medium text-blue-600 hover:text-blue-500"
+            className="text-teal-400 hover:text-teal-300 transition-colors duration-200 font-medium"
           >
-            create a new account
+            Sign up
           </Link>
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit(submitHandler)}>
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email address
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiMail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  {...register("email", {
-                    required: "Email is required",
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: "Invalid email address",
-                    },
-                  })}
-                  className={`pl-10 block w-full shadow-sm sm:text-sm rounded-md ${
-                    errors.email
-                      ? "border-red-300 focus:ring-red-500 focus:border-red-500"
-                      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                  } border p-2`}
-                />
-              </div>
-              {errors.email && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiLock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  {...register("password", {
-                    required: "Password is required",
-                    minLength: {
-                      value: 6,
-                      message: "Password must be at least 6 characters",
-                    },
-                  })}
-                  className={`pl-10 block w-full shadow-sm sm:text-sm rounded-md ${
-                    errors.password
-                      ? "border-red-300 focus:ring-red-500 focus:border-red-500"
-                      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                  } border p-2`}
-                />
-              </div>
-              {errors.password && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="ml-2 block text-sm text-gray-900"
-                >
-                  Remember me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <Link
-                  to="/forgot-password"
-                  className="font-medium text-blue-600 hover:text-blue-500"
-                >
-                  Forgot your password?
-                </Link>
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-2" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
+
+      {/* Animation styles */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,33 +1,26 @@
 const jwt = require("jsonwebtoken");
-require("dotenv").config(); // Load environment variables
+require("dotenv").config();
 const User = require("../models/UserModel");
 
 module.exports = async function (req, res, next) {
-  // Get token from header or cookie
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-  } else if (req.cookies?.token) {
-    token = req.cookies.token;
-  }
-
-  // Check if token exists
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required. Please log in.",
-    });
-  }
-
   try {
-    // Verify token using environment variable
+    // Get token from header, cookie, or query
+    const token =
+      req.headers.authorization?.split(" ")[1] ||
+      req.cookies?.token ||
+      req.query?.token;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required. Please log in.",
+      });
+    }
+
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if token is expired
+    // Check expiration
     if (decoded.exp <= Date.now() / 1000) {
       return res.status(401).json({
         success: false,
@@ -35,11 +28,8 @@ module.exports = async function (req, res, next) {
       });
     }
 
-    // Find user and exclude password
-    const user = await User.findById(decoded.user.id)
-      .select("-password")
-      .lean();
-
+    // Find user
+    const user = await User.findById(decoded.user.id).select("-password");
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -47,8 +37,8 @@ module.exports = async function (req, res, next) {
       });
     }
 
-    // Check if account is active
-    if (user.status !== "active") {
+    // Check account status
+    if (user.status !== "active" && user.status !== "approved") {
       return res.status(403).json({
         success: false,
         message: "Account is not active. Please contact support.",
@@ -56,23 +46,21 @@ module.exports = async function (req, res, next) {
     }
 
     // Driver-specific checks
-    if (req.path.startsWith("/driver")) {
+    if (req.path.startsWith("/driver") || req.path.startsWith("/api/driver")) {
       if (user.role !== "driver") {
         return res.status(403).json({
           success: false,
-          message: "Driver privileges required for this action.",
+          message: "Driver privileges required.",
         });
       }
 
-      // Check if driver profile is complete
-      if (!user.driverDetails || !user.driverDetails.licenseNumber) {
+      if (!user.driverDetails?.licenseNumber) {
         return res.status(403).json({
           success: false,
           message: "Complete your driver profile to access this feature.",
         });
       }
 
-      // Attach driver details to request
       req.driver = {
         licenseNumber: user.driverDetails.licenseNumber,
         vehicleDetails: user.driverDetails.vehicleDetails,
@@ -90,7 +78,7 @@ module.exports = async function (req, res, next) {
       res.clearCookie("token");
     }
 
-    let message = "Invalid authentication token";
+    let message = "Authentication failed";
     if (err.name === "TokenExpiredError") {
       message = "Session expired. Please log in again.";
     } else if (err.name === "JsonWebTokenError") {

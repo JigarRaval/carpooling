@@ -1,218 +1,771 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-toastify";
 import {
   FaCar,
   FaMoneyBillWave,
-  FaUsers,
-  FaCalendarAlt,
-  FaStar,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaChartLine,
+  FaHistory,
+  FaWallet,
+  FaUser,
+  FaMapMarkerAlt,
+  FaClock,
+  FaCog,
 } from "react-icons/fa";
+import { FiRefreshCw } from "react-icons/fi";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const DriverDashboard = () => {
-  const [stats, setStats] = useState({
-    totalRides: 0,
-    earnings: 0,
-    passengers: 0,
-    upcomingRides: 0,
-    averageRating: 0,
+  const [dashboardData, setDashboardData] = useState({
+    stats: {
+      totalRides: 0,
+      completedRides: 0,
+      cancelledRides: 0,
+      totalEarnings: 0,
+    },
+    recentRides: [],
+    weeklyEarnings: [],
+    vehicle: null,
   });
-  const [recentRides, setRecentRides] = useState([]);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [rides, setRides] = useState([]);
+  const [earnings, setEarnings] = useState([]);
+  const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [ridePage, setRidePage] = useState(1);
+  const [earningsPage, setEarningsPage] = useState(1);
+  const navigate = useNavigate();
+
+  // Create axios instance with auth token
+  const api = axios.create({
+    baseURL: "/api/drivers",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-
-        const api = axios.create({
-          baseURL: "/api",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          withCredentials: true,
-        });
-
-        const [statsRes, ridesRes, passengersRes] = await Promise.all([
-          api.get("/driver/stats"),
-          api.get("/driver/rides/recent"),
-          api.get("/driver/passengers/count"),
-        ]);
-
-        // Safely handle potential undefined values
-        const safeStats = {
-          totalRides: statsRes.data.stats?.totalRides || 0,
-          earnings: statsRes.data.stats?.earnings || 0,
-          upcomingRides: statsRes.data.stats?.upcomingRides || 0,
-          averageRating: statsRes.data.stats?.averageRating || 0,
-          passengers: passengersRes.data?.count || 0,
-        };
-
-        setStats(safeStats);
-        setRecentRides(ridesRes.data?.rides || []);
-      } catch (err) {
-        console.error("Dashboard error:", err);
-        setError(
-          err.response?.data?.message || "Failed to load dashboard data"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDashboardData();
+    fetchVehicle();
   }, []);
 
-  if (error) {
+  useEffect(() => {
+    if (activeTab === "rides") {
+      fetchRides();
+    } else if (activeTab === "earnings") {
+      fetchEarnings();
+    }
+  }, [activeTab, ridePage, earningsPage]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get("/dashboard");
+      setDashboardData(data);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        navigate("/login");
+      } else {
+        toast.error("Failed to load dashboard data");
+        console.error(error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRides = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get(`/rides?page=${ridePage}`);
+      setRides(data);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        navigate("/login");
+      } else {
+        toast.error("Failed to load rides");
+        console.error(error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEarnings = async () => {
+    try {
+      setLoading(true);
+      const { data } = await api.get(`/earnings?page=${earningsPage}`);
+      setEarnings(data);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        navigate("/login");
+      } else {
+        toast.error("Failed to load earnings");
+        console.error(error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchVehicle = async () => {
+    try {
+      const { data } = await api.get("/vehicle");
+      setVehicle(data);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        navigate("/login");
+      } else {
+        console.error("Failed to load vehicle info");
+      }
+    }
+  };
+
+  const refreshData = () => {
+    fetchDashboardData();
+    if (activeTab === "rides") fetchRides();
+    if (activeTab === "earnings") fetchEarnings();
+    fetchVehicle();
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    const options = {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+    return new Date(dateString).toLocaleDateString("en-US", options);
+  };
+
+  const earningsChartData = {
+    labels: dashboardData?.weeklyEarnings?.map((item) => item._id) || [],
+    datasets: [
+      {
+        label: "Daily Earnings",
+        data: dashboardData?.weeklyEarnings?.map((item) => item.total) || [],
+        backgroundColor: "rgba(16, 185, 129, 0.7)",
+        borderColor: "rgba(16, 185, 129, 1)",
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const earningsChartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top",
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            return formatCurrency(context.raw);
+          },
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: (value) => formatCurrency(value),
+        },
+      },
+    },
+  };
+
+  if (loading && !dashboardData) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
-          role="alert"
-        >
-          <strong className="font-bold">Error!</strong>
-          <span className="block sm:inline"> {error}</span>
-          <button
-            onClick={() => window.location.reload()}
-            className="absolute top-0 bottom-0 right-0 px-4 py-3"
-          >
-            <svg
-              className="fill-current h-6 w-6 text-red-500"
-              role="button"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-            >
-              <title>Close</title>
-              <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z" />
-            </svg>
-          </button>
-        </div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-500"></div>
       </div>
     );
   }
 
+  // Initialize with default values if data is not loaded yet
+  const stats = dashboardData?.stats || {
+    totalRides: 0,
+    completedRides: 0,
+    cancelledRides: 0,
+    totalEarnings: 0,
+  };
+
+  const recentRides = dashboardData?.recentRides || [];
+  const weeklyEarnings = dashboardData?.weeklyEarnings || [];
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Driver Dashboard</h1>
-
-      {loading ? (
-        <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    <div className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">Driver Dashboard</h1>
+          <button
+            onClick={refreshData}
+            className="flex items-center text-teal-600 hover:text-teal-800"
+          >
+            <FiRefreshCw className="mr-2" />
+            Refresh
+          </button>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <StatCard
-              icon={<FaCar className="text-blue-600" />}
-              title="Total Rides"
-              value={stats.totalRides}
-              color="bg-blue-100"
-            />
-            <StatCard
-              icon={<FaMoneyBillWave className="text-green-600" />}
-              title="Total Earnings"
-              value={`$${(stats.earnings || 0).toFixed(2)}`}
-              color="bg-green-100"
-            />
-            <StatCard
-              icon={<FaUsers className="text-purple-600" />}
-              title="Passengers"
-              value={stats.passengers}
-              color="bg-purple-100"
-            />
-            <StatCard
-              icon={<FaCalendarAlt className="text-orange-600" />}
-              title="Upcoming Rides"
-              value={stats.upcomingRides}
-              color="bg-orange-100"
-            />
-            <StatCard
-              icon={<FaStar className="text-yellow-600" />}
-              title="Average Rating"
-              value={(stats.averageRating || 0).toFixed(1)}
-              color="bg-yellow-100"
-            />
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Recent Rides</h2>
-              <div className="space-y-4">
-                {recentRides.length > 0 ? (
-                  recentRides.map((ride) => (
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-gray-200 mb-6">
+          <button
+            className={`py-2 px-4 font-medium ${
+              activeTab === "dashboard"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("dashboard")}
+          >
+            <FaChartLine className="inline mr-2" />
+            Dashboard
+          </button>
+          <button
+            className={`py-2 px-4 font-medium ${
+              activeTab === "rides"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("rides")}
+          >
+            <FaHistory className="inline mr-2" />
+            Ride History
+          </button>
+          <button
+            className={`py-2 px-4 font-medium ${
+              activeTab === "earnings"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("earnings")}
+          >
+            <FaWallet className="inline mr-2" />
+            Earnings
+          </button>
+          <button
+            className={`py-2 px-4 font-medium ${
+              activeTab === "vehicle"
+                ? "text-teal-600 border-b-2 border-teal-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("vehicle")}
+          >
+            <FaCar className="inline mr-2" />
+            My Vehicle
+          </button>
+        </div>
+
+        {/* Dashboard Tab */}
+        {activeTab === "dashboard" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {/* Stats Cards - Updated to use the safe stats object */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-teal-100 text-teal-600 mr-4">
+                  <FaCar className="text-xl" />
+                </div>
+                <div>
+                  <p className="text-gray-500">Total Rides</p>
+                  <h3 className="text-2xl font-bold">{stats.totalRides}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                  <FaCheckCircle className="text-xl" />
+                </div>
+                <div>
+                  <p className="text-gray-500">Completed Rides</p>
+                  <h3 className="text-2xl font-bold">{stats.completedRides}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-red-100 text-red-600 mr-4">
+                  <FaTimesCircle className="text-xl" />
+                </div>
+                <div>
+                  <p className="text-gray-500">Cancelled Rides</p>
+                  <h3 className="text-2xl font-bold">{stats.cancelledRides}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                  <FaMoneyBillWave className="text-xl" />
+                </div>
+                <div>
+                  <p className="text-gray-500">Total Earnings</p>
+                  <h3 className="text-2xl font-bold">
+                    {formatCurrency(stats.totalEarnings)}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly Earnings Chart */}
+            <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Weekly Earnings</h3>
+              <div className="h-64">
+                <Bar
+                  data={{
+                    labels: weeklyEarnings.map((item) => item._id) || [],
+                    datasets: [
+                      {
+                        label: "Daily Earnings",
+                        data: weeklyEarnings.map((item) => item.total) || [],
+                        backgroundColor: "rgba(16, 185, 129, 0.7)",
+                        borderColor: "rgba(16, 185, 129, 1)",
+                        borderWidth: 1,
+                      },
+                    ],
+                  }}
+                  options={earningsChartOptions}
+                />
+              </div>
+            </div>
+
+            {/* Recent Rides */}
+            <div className="bg-white rounded-lg shadow p-6 md:col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Recent Rides</h3>
+              {recentRides.length > 0 ? (
+                <div className="space-y-4">
+                  {recentRides.map((ride) => (
                     <div
-                      key={ride.id}
-                      className="border-b border-gray-200 pb-4 last:border-0 last:pb-0"
+                      key={ride._id}
+                      className="border-b border-gray-100 pb-4 last:border-0"
                     >
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-medium">
-                          {ride.from} → {ride.to}
-                        </h3>
-                        <span className="text-sm text-gray-600">
-                          {ride.date}
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">
+                            <FaUser className="inline mr-2 text-gray-400" />
+                            {ride.passenger?.name || "Passenger"}
+                          </p>
+                          <p className="text-sm text-gray-500 ml-6">
+                            <FaMapMarkerAlt className="inline mr-1" />
+                            {ride.pickupLocation.address} →{" "}
+                            {ride.dropoffLocation.address}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            ride.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : ride.status === "cancelled"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {ride.status}
                         </span>
                       </div>
-                      <div className="flex justify-between text-sm text-gray-600">
+                      <div className="flex justify-between mt-2 text-sm text-gray-500">
                         <span>
-                          {ride.passengers || 1} passenger
-                          {ride.passengers !== 1 ? "s" : ""} (
-                          {ride.passengerName || "Anonymous"})
+                          <FaClock className="inline mr-1" />
+                          {formatDate(ride.createdAt)}
                         </span>
-                        <span>${(ride.fare || 0).toFixed(2)}</span>
+                        <span className="font-medium">
+                          {formatCurrency(ride.fare.total)}
+                        </span>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500">No recent rides found</p>
-                )}
-              </div>
-              <Link
-                to="/driver/my-rides"
-                className="inline-block mt-4 text-blue-600 hover:underline"
-              >
-                View all rides →
-              </Link>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-              <div className="space-y-3">
-                <Link
-                  to="/driver/offer-ride"
-                  className="block bg-blue-600 text-white text-center py-3 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Offer New Ride
-                </Link>
-                <Link
-                  to="/driver/profile"
-                  className="block border border-gray-300 text-center py-3 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  Update Profile
-                </Link>
-                <Link
-                  to="/driver/earnings"
-                  className="block border border-gray-300 text-center py-3 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  View Earnings
-                </Link>
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">No recent rides</p>
+              )}
             </div>
           </div>
-        </>
-      )}
+        )}
+
+        {/* Rides Tab */}
+        {activeTab === "rides" && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Ride History</h3>
+              {rides.rides?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Passenger
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Route
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Fare
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rides.rides.map((ride) => (
+                        <tr key={ride._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                <FaUser className="text-gray-500" />
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {ride.passenger?.name || "Passenger"}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {ride.passenger?.phoneNumber || "N/A"}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900 max-w-xs truncate">
+                              {ride.pickupLocation.address} →{" "}
+                              {ride.dropoffLocation.address}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(ride.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                ride.status === "completed"
+                                  ? "bg-green-100 text-green-800"
+                                  : ride.status === "cancelled"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {ride.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {formatCurrency(ride.fare.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No rides found</p>
+              )}
+              {rides.total > 0 && (
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-gray-500">
+                    Showing page {ridePage} of {rides.pages}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setRidePage((p) => Math.max(1, p - 1))}
+                      disabled={ridePage === 1}
+                      className="px-3 py-1 border rounded disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setRidePage((p) => Math.min(rides.pages, p + 1))
+                      }
+                      disabled={ridePage === rides.pages}
+                      className="px-3 py-1 border rounded disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Earnings Tab */}
+        {activeTab === "earnings" && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Earnings</h3>
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-blue-800">
+                  Total Earnings: {formatCurrency(earnings.totalEarnings || 0)}
+                </h4>
+              </div>
+              {earnings.earnings?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ride
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Payment Method
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {earnings.earnings.map((earning) => (
+                        <tr key={earning._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(earning.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {earning.rideId ? (
+                              <div className="text-sm text-gray-900 max-w-xs truncate">
+                                {earning.rideId.pickupLocation.address} →{" "}
+                                {earning.rideId.dropoffLocation.address}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {formatCurrency(earning.netEarnings)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {earning.paymentMethod}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                earning.paymentStatus === "completed"
+                                  ? "bg-green-100 text-green-800"
+                                  : earning.paymentStatus === "failed"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {earning.paymentStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">No earnings found</p>
+              )}
+              {earnings.total > 0 && (
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-gray-500">
+                    Showing page {earningsPage} of {earnings.pages}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setEarningsPage((p) => Math.max(1, p - 1))}
+                      disabled={earningsPage === 1}
+                      className="px-3 py-1 border rounded disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() =>
+                        setEarningsPage((p) => Math.min(earnings.pages, p + 1))
+                      }
+                      disabled={earningsPage === earnings.pages}
+                      className="px-3 py-1 border rounded disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vehicle Tab */}
+        {activeTab === "vehicle" && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-6">My Vehicle</h3>
+              {vehicle ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-4">
+                      Vehicle Information
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Make
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.make}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Model
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.model}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Year
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.year}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Color
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.color}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          License Plate
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.licensePlate}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Vehicle Type
+                        </label>
+                        <p className="mt-1 text-sm font-medium capitalize">
+                          {vehicle.vehicleType}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-4">
+                      Documents
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Registration Number
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.registration?.number || "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Registration Expiry
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.registration?.expiry
+                            ? new Date(
+                                vehicle.registration.expiry
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Insurance Provider
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.insurance?.provider || "Not provided"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500">
+                          Insurance Expiry
+                        </label>
+                        <p className="mt-1 text-sm font-medium">
+                          {vehicle.insurance?.expiry
+                            ? new Date(
+                                vehicle.insurance.expiry
+                              ).toLocaleDateString()
+                            : "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate("/driver/vehicle/edit")}
+                      className="mt-6 px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors"
+                    >
+                      <FaCog className="inline mr-2" />
+                      Update Vehicle Info
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">
+                    No vehicle information found
+                  </p>
+                  <button
+                    onClick={() => navigate("/driver/vehicle/add")}
+                    className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors"
+                  >
+                    <FaCar className="inline mr-2" />
+                    Add Vehicle Information
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
-
-const StatCard = ({ icon, title, value, color }) => (
-  <div className={`${color} p-6 rounded-lg flex items-center`}>
-    <div className="mr-4 text-3xl">{icon}</div>
-    <div>
-      <p className="text-gray-600">{title}</p>
-      <p className="text-2xl font-bold">{value}</p>
-    </div>
-  </div>
-);
 
 export default DriverDashboard;

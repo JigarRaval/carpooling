@@ -20,7 +20,7 @@ import DriverLogin from './components/layouts/DriverLogin'
 // import { NavbarSelector } from './components/layouts/NavbarSelector'
 import Dashboard from './components/layouts/DriverDashboard'
 import { RideConfirmation } from './components/pages/RideConfirmation'
-import { UserNavbar } from './components/layouts/UserNavbar'
+import UserNavbar from "./components/layouts/UserNavbar";
 import DriverSignup from './components/layouts/DriverSignup'
 import DriverNavbar from './components/layouts/DriverNavbar'
 import DriverDashboard from './components/layouts/DriverDashboard'
@@ -30,24 +30,22 @@ function App() {
   axois.defaults.baseURL = "http://localhost:3000"
 
   return (
-    <div className='flex flex-col'>
-      <DriverNavbar />
+    <div className="flex flex-col">
+      <UserNavbar />
       {/* <body className="layout-fixed sidebar-expand-lg bg-body-tertiary">
        <div className='app-wrapper'> */}
       <Routes>
-        <Route path='/login' element={<Login />}></Route>
-        <Route path='/register' element={<SignUp />}></Route>
-        <Route path='/' element={<Homepage />} />
+        <Route path="/login" element={<Login />}></Route>
+        <Route path="/register" element={<SignUp />}></Route>
+        <Route path="/" element={<Homepage />} />
         <Route path="/resetpassword/:token" element={<ResetPassword />}></Route>
 
-        <Route path='' element={<PrivateRoutes />}>
-          <Route path='/addride' element={<AddRide />} />
+        <Route path="" element={<PrivateRoutes />}>
+          <Route path="/addride" element={<AddRide />} />
           <Route path="/ride-details/:id" element={<RideDetails />} />
-          <Route path='/myrides' element={<RidesPage />} />
+          <Route path="/myrides" element={<RidesPage />} />
           {/* <Route path='/detail' element={<RideDetails />} /> */}
-          <Route path='/profile' element={<UserProfile />}>
-          </Route>
-
+          <Route path="/profile" element={<UserProfile />}></Route>
         </Route>
 
         <Route path="/driver/dashboard/:driverId" element={<Dashboard />} />
@@ -68,7 +66,7 @@ function App() {
       {/* </div>
      </body> */}
     </div>
-  )
+  );
 }
 
 export default App
