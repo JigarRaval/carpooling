@@ -21,13 +21,14 @@ import DriverLogin from './components/layouts/DriverLogin'
 import Dashboard from './components/layouts/DriverDashboard'
 import { RideConfirmation } from './components/pages/RideConfirmation'
 import UserNavbar from "./components/layouts/UserNavbar";
-import DriverSignup from './components/layouts/DriverSignup'
-import DriverNavbar from './components/layouts/DriverNavbar'
+import DriverSignup from "./components/layouts/DriverSignup";
 import DriverDashboard from './components/layouts/DriverDashboard'
 import DriverLandingPage from './components/layouts/DriverLandingPage'
+import AddEditVehicle from "./components/layouts/AddEditVehicle";
+import VehicleForm from "./components/layouts/VehicleForm";
 
 function App() {
-  axois.defaults.baseURL = "http://localhost:3000"
+  axois.defaults.baseURL = "http://localhost:3000";
 
   return (
     <div className="flex flex-col">
@@ -47,7 +48,10 @@ function App() {
           {/* <Route path='/detail' element={<RideDetails />} /> */}
           <Route path="/profile" element={<UserProfile />}></Route>
         </Route>
-
+        <Route path="/driver/vehicle/add" element={<VehicleForm />} />
+        <Route path="/driver/vehicle/edit" element={<VehicleForm />} />
+        <Route path="/driver/vehicle/add" element={<AddEditVehicle />} />
+        <Route path="/driver/vehicle/edit/:id" element={<AddEditVehicle />} />
         <Route path="/driver/dashboard/:driverId" element={<Dashboard />} />
         <Route path="/driver/offer-ride" element={<OfferRide />} />
         <Route path="/driver/rides" element={<MyRides />} />

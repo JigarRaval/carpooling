@@ -159,3 +159,118 @@ exports.driverLogin = async (req, res) => {
     });
   }
 };
+exports.getDriverRides = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const driverId = req.user.id;
+
+    const query = { driver: driverId };
+    if (status) query.status = status;
+
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { createdAt: -1 },
+      populate: [
+        { path: "driver", select: "name email phone profilePhoto" },
+        { path: "passenger", select: "name email phone profilePhoto" },
+      ],
+    };
+
+    const rides = await rideModel.paginate(query, options);
+
+    res.json({
+      success: true,
+      data: {
+        rides: rides.docs,
+        pagination: {
+          total: rides.totalDocs,
+          pages: rides.totalPages,
+          page: rides.page,
+          limit: rides.limit,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching driver rides:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching rides",
+      error: err.message,
+    });
+  }
+};
+exports.getDriverProfile = async (req, res) => {
+  try {
+    const driver = await User.findById(req.params.id)
+      .select("-password -__v")
+      .lean();
+
+    if (!driver || driver.role !== "driver") {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: driver,
+    });
+  } catch (error) {
+    console.error("Error fetching driver profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
+// Update driver profile
+exports.updateDriverProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Don't allow role or email changes
+    if (updateData.role || updateData.email) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change role or email",
+      });
+    }
+
+    // Handle password updates separately if needed
+    if (updateData.password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(updateData.password, salt);
+    }
+
+    const updatedDriver = await User.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select("-password -__v");
+
+    if (!updatedDriver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Driver profile updated successfully",
+      data: updatedDriver,
+    });
+  } catch (error) {
+    console.error("Error updating driver profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating driver data",
+      error: error.message,
+    });
+  }
+};

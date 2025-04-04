@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FiMenu, FiUser, FiX } from "react-icons/fi";
 import { FaCar, FaMoneyBillWave, FaHeadset, FaCog } from "react-icons/fa";
 
-const UserNavbar = () => {
+const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -52,8 +52,8 @@ const UserNavbar = () => {
 
   // Passenger Nav Items
   const passengerMenuItems = [
-    { label: "Find a Ride", path: "/find-ride", icon: null },
-    { label: "My Rides", path: "/my-rides", icon: null },
+    { label: "Find a Ride", path: "/addride", icon: null },
+    { label: "My Rides", path: "/myrides", icon: null },
   ];
 
   // Driver Nav Items
@@ -126,7 +126,7 @@ const UserNavbar = () => {
 
   return (
     <nav
-      className={`fixed w-full z-50 transition-all duration-300 ${
+      className={`sticky w-full z-50 transition-all duration-300 ${
         scrolled
           ? "bg-gray-800 shadow-lg py-2"
           : "bg-gradient-to-b from-gray-900 to-gray-800 py-4"
@@ -306,4 +306,4 @@ const UserNavbar = () => {
   );
 };
 
-export default UserNavbar;
+export default Navbar;

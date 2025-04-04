@@ -42,7 +42,7 @@ const SignUp = () => {
             color: data.color,
             licensePlate: data.licensePlate,
           },
-          status: "pending_verification",
+          status: "approved",
         };
       }
 
